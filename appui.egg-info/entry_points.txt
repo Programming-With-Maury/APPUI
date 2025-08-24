@@ -1,0 +1,2 @@
+[console_scripts]
+appui = appui.cli:run
