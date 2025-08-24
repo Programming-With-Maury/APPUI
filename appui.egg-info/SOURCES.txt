@@ -17,5 +17,5 @@ appui.egg-info/top_level.txt
 appui/dsl/__init__.py
 appui/dsl/components.py
 appui/static/index.html
-appui/static/assets/index-rPKeyKM8.js
+appui/static/assets/index-yE3rrf6o.js
 tests/test_server.py

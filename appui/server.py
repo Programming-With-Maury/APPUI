@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -32,6 +32,16 @@ def create_app(builder: Callable[[Session], UINode], config: Optional[AppUIConfi
     async def websocket_endpoint(websocket: WebSocket) -> None:
         await websocket.accept()
         session = Session(builder=builder)
+        # Seed route from URL query param (e.g., /ws?path=widgets)
+        try:
+            path_param = websocket.query_params.get("path")  # type: ignore[attr-defined]
+            if isinstance(path_param, str) and path_param:
+                # Normalize: strip leading slashes
+                norm = path_param.lstrip("/")
+                session.vars["path"] = norm or "home"
+        except Exception:
+            # Best-effort; ignore if unavailable in environment
+            pass
 
         async def send_tree() -> None:
             tree = session.build_tree()
@@ -56,6 +66,21 @@ def create_app(builder: Callable[[Session], UINode], config: Optional[AppUIConfi
                     await send_tree()
         except WebSocketDisconnect:
             pass
+
+    if cfg.enable_uploads:
+        cfg.upload_dir.mkdir(parents=True, exist_ok=True)
+
+        @app.post("/upload")
+        async def upload(file: UploadFile = File(...)) -> Dict[str, Any]:
+            contents = await file.read()
+            size_mb = len(contents) / (1024 * 1024)
+            if size_mb > cfg.max_upload_size_mb:
+                raise HTTPException(status_code=413, detail="File too large")
+            target = (cfg.upload_dir / file.filename).resolve()
+            if cfg.upload_dir not in target.parents and cfg.upload_dir != target:
+                raise HTTPException(status_code=400, detail="Invalid file path")
+            target.write_bytes(contents)
+            return {"filename": file.filename, "size": len(contents)}
 
     static_dir = cfg.static_dir or (Path(__file__).parent / "static")
     if cfg.mount_static and static_dir.exists():

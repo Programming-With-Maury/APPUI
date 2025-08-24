@@ -10,7 +10,10 @@ export type MessageToServer = {
 
 export function connectWebSocket(onTree: (tree: UINode) => void): WebSocket {
   const origin = window.location.origin; // http(s)://host[:port]
-  const wsUrl = origin.replace(/^http/, "ws") + "/ws";
+  // Forward the current path (without leading slash) to seed server-side route
+  const currentPath = window.location.pathname.replace(/^\//, "");
+  const query = currentPath ? `?path=${encodeURIComponent(currentPath)}` : "";
+  const wsUrl = origin.replace(/^http/, "ws") + "/ws" + query;
   const ws = new WebSocket(wsUrl);
   ws.onmessage = (ev) => {
     try {
@@ -18,6 +21,13 @@ export function connectWebSocket(onTree: (tree: UINode) => void): WebSocket {
       onTree(parsed);
     } catch {}
   };
+  // Keep server in sync on back/forward navigation
+  window.addEventListener("popstate", () => {
+    const path = window.location.pathname.replace(/^\//, "");
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ event: "navigate", nodeId: "__route__", value: path }));
+    }
+  });
   return ws;
 }
 

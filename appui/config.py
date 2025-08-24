@@ -19,4 +19,9 @@ class AppUIConfig(BaseModel):
     static_dir: Optional[Path] = None
     root_path: str = "/"
 
+    # Uploads
+    enable_uploads: bool = True
+    upload_dir: Path = Path("/tmp/appui-uploads")
+    max_upload_size_mb: int = 50
+
 
